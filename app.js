@@ -1,49 +1,61 @@
-// Lógica PWA Cámara con galería horizontal, limpiar y cambio de cámara
+// UI refs
 const els = {
     open: document.getElementById('openCamera'),
     snap: document.getElementById('takePhoto'),
     flip: document.getElementById('switchCamera'),
     clear: document.getElementById('clearGallery'),
-    container: document.getElementById('cameraContainer'),
+    stage: document.getElementById('cameraContainer'),
     video: document.getElementById('video'),
     canvas: document.getElementById('canvas'),
     gallery: document.getElementById('gallery'),
 };
-
 const ctx = els.canvas.getContext('2d');
 
 let stream = null;
-let facing = 'environment'; // 'user' = frontal
-const objectUrls = []; // URLs temporales (blob:) durante esta sesión
+let facing = 'environment';   // 'user' para frontal
+const objectUrls = [];        // URLs temporales de esta sesión
+
+// Ajusta las variables CSS --frame-w / --frame-h a partir del video real
+function setFrameVarsFromVideo() {
+    const vw = els.video.videoWidth || 320;
+    const vh = els.video.videoHeight || 240;
+
+    // Escala para caber en viewport, manteniendo proporción
+    const maxW = Math.min(480, window.innerWidth - 48); // UI limpia sin desbordar
+    const scale = Math.min(1, maxW / vw);
+    const dispW = Math.round(vw * scale);
+    const dispH = Math.round(vh * scale);
+
+    document.documentElement.style.setProperty('--frame-w', dispW + 'px');
+    document.documentElement.style.setProperty('--frame-h', dispH + 'px');
+}
 
 async function startCamera() {
-    stopCamera();
+    stopCamera(); // por si acaso
 
-    // Intento 1: exact facing; 2: ideal; 3: cualquiera disponible
-    let constraints = { video: { facingMode: { exact: facing }, width: { ideal: 320 }, height: { ideal: 240 } }, audio: false };
+    let constraints = { video: { facingMode: { exact: facing }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false };
     try {
         stream = await navigator.mediaDevices.getUserMedia(constraints);
-    } catch (e) {
+    } catch {
         try {
             constraints = { video: { facingMode: facing }, audio: false };
             stream = await navigator.mediaDevices.getUserMedia(constraints);
-        } catch (e2) {
-            try {
-                constraints = { video: true, audio: false };
-                stream = await navigator.mediaDevices.getUserMedia(constraints);
-            } catch (e3) {
-                console.error('No se pudo abrir cámara:', e3);
-                alert('No se pudo abrir la cámara. Verifica permisos y que estés en HTTPS/localhost.');
-                return;
-            }
+        } catch {
+            constraints = { video: true, audio: false };
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
         }
     }
 
     els.video.srcObject = stream;
-    els.container.style.display = 'block';
-    els.open.textContent = 'Cámara abierta';
-    els.open.disabled = true;
-    updateFlipLabel();
+
+    // Asegura que el tamaño del frame se actualice cuando el video conozca sus dimensiones reales
+    els.video.onloadedmetadata = () => {
+        setFrameVarsFromVideo();
+        els.stage.classList.add('active');
+        els.open.textContent = 'Cámara abierta';
+        els.open.disabled = true;
+        updateFlipLabel();
+    };
 }
 
 function stopCamera() {
@@ -52,7 +64,7 @@ function stopCamera() {
     }
     stream = null;
     els.video.srcObject = null;
-    els.container.style.display = 'none';
+    els.stage.classList.remove('active');
     els.open.textContent = 'Abrir cámara';
     els.open.disabled = false;
 }
@@ -61,6 +73,7 @@ function updateFlipLabel() {
     els.flip.textContent = (facing === 'environment') ? 'Cambiar a frontal' : 'Cambiar a trasera';
 }
 
+// Captura y agrega a galería con MISMAS dimensiones visuales que el frame
 function takePhoto() {
     if (!stream) {
         alert('Primero abre la cámara');
@@ -68,17 +81,19 @@ function takePhoto() {
     }
     const w = els.video.videoWidth || 320;
     const h = els.video.videoHeight || 240;
+
+    // Renderizamos a resolución real del frame
     els.canvas.width = w;
     els.canvas.height = h;
     ctx.drawImage(els.video, 0, 0, w, h);
 
     els.canvas.toBlob((blob) => {
         if (!blob) return;
-        const url = URL.createObjectURL(blob); // URL temporal
+        const url = URL.createObjectURL(blob);
         objectUrls.push(url);
         addThumb(url);
 
-        // Auto-scroll al final para ver la última
+        // auto-scroll a la última
         requestAnimationFrame(() => {
             els.gallery.scrollTo({ left: els.gallery.scrollWidth, behavior: 'smooth' });
         });
@@ -95,19 +110,19 @@ function addThumb(url) {
     img.alt = 'Foto capturada';
     img.decoding = 'async';
 
-    const a = document.createElement('a');
-    a.href = url;
-    const ts = new Date().toISOString().replace(/[:.]/g, '-');
-    a.download = 'captura-' + ts + '.png';
-    a.textContent = 'Descargar';
+    // (opcional) descarga rápida
+    // const a = document.createElement('a');
+    // a.href = url;
+    // a.download = 'captura-' + new Date().toISOString().replace(/[:.]/g,'-') + '.png';
+    // a.textContent = 'Descargar';
+    // figure.appendChild(a);
 
     figure.appendChild(img);
-    figure.appendChild(a);
     els.gallery.appendChild(figure);
 }
 
 function clearGallery() {
-    for (const u of objectUrls) URL.revokeObjectURL(u); // liberar memoria
+    for (const u of objectUrls) URL.revokeObjectURL(u);
     objectUrls.length = 0;
     els.gallery.innerHTML = '';
 }
@@ -123,6 +138,11 @@ els.open.addEventListener('click', startCamera);
 els.snap.addEventListener('click', takePhoto);
 els.clear.addEventListener('click', clearGallery);
 els.flip.addEventListener('click', flipCamera);
+
+// Recalcula tamaños si cambia el viewport (mantener paridad cámara/galería)
+window.addEventListener('resize', () => {
+    if (stream && els.video.videoWidth) setFrameVarsFromVideo();
+});
 
 // Buenas prácticas de liberación
 window.addEventListener('pagehide', stopCamera);

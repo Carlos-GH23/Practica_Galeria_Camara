@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#0b1220" />
     <title>PWA Cámara</title>
 
     <link rel="manifest" href="manifest.json" />
@@ -15,8 +15,13 @@
             --bg: #0b1220;
             --panel: #0f182d;
             --border: #1f2a44;
+            --muted: #93a4c3;
             --fg: #e6edf3;
             --accent: #0ea5e9;
+            /* dimensiones del frame (se ajustan dinámicamente desde JS en cuanto carga la cámara) */
+            --frame-w: 420px;
+            --frame-h: 315px;
+            /* 4:3 por defecto */
         }
 
         * {
@@ -24,170 +29,213 @@
         }
 
         body {
-            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
             margin: 0;
-            padding: 16px;
             background: var(--bg);
             color: var(--fg);
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
         }
 
         header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: linear-gradient(180deg, #0c152b 0%, rgba(12, 21, 43, 0.8) 70%, transparent 100%);
+            padding: 16px 16px 8px;
+            backdrop-filter: blur(6px);
+            border-bottom: 1px solid #0d1a33;
+        }
+
+        .container {
+            padding: 16px;
+            max-width: 980px;
+            margin: 0 auto;
         }
 
         h1 {
+            margin: 0 0 6px;
             font-size: 1.25rem;
-            margin: 0 0 8px;
+            letter-spacing: .2px;
         }
 
-        p {
-            opacity: .9;
+        .hint {
+            color: var(--muted);
+            font-size: .95rem;
+            margin: 0;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 14px 0;
         }
 
         button {
             padding: 10px 14px;
             border-radius: 12px;
             border: 1px solid var(--border);
-            background: #121b34;
+            background: #111a33;
             color: var(--fg);
-            cursor: pointer;
             font-weight: 600;
+            cursor: pointer;
+            transition: transform .08s ease, background .15s ease, box-shadow .15s ease;
+            box-shadow: 0 1px 0 rgba(0, 0, 0, .25), 0 6px 12px rgba(0, 0, 0, .15) inset;
         }
 
         button:hover {
             background: #152143;
         }
 
+        button:active {
+            transform: translateY(1px);
+        }
+
         .primary {
             background: var(--accent);
-            color: #071222;
+            color: #09111f;
             border-color: var(--accent);
+            box-shadow: none;
         }
 
-        .row {
-            display: flex;
-            gap: 8px;
-            margin: 10px 0 14px;
-            flex-wrap: wrap;
+        .danger {
+            background: #92272a;
+            border-color: #a43a3e;
         }
 
-        #cameraContainer {
-            display: none;
-            margin-top: 12px;
-        }
-
-        .video-wrap {
+        .frame {
+            width: var(--frame-w);
+            height: var(--frame-h);
             background: var(--panel);
             border: 1px solid var(--border);
             border-radius: 16px;
             overflow: hidden;
+            box-shadow: 0 10px 24px rgba(0, 0, 0, .35);
         }
 
-        video,
-        canvas {
-            width: 100%;
-            max-width: 420px;
-            background: #000;
+        .stage {
+            display: none;
+        }
+
+        .stage.active {
             display: block;
         }
 
+        video {
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: #000;
+            object-fit: contain;
+        }
+
+        /* Galería horizontal con thumbs del MISMO tamaño que el frame */
         .gallery-wrap {
             margin-top: 16px;
         }
 
-        .gallery-title {
+        .gallery-head {
             display: flex;
             align-items: center;
             justify-content: space-between;
+            margin-bottom: 8px;
         }
 
-        #gallery {
+        .gallery {
             display: flex;
-            gap: 10px;
+            gap: 12px;
             overflow-x: auto;
             overflow-y: hidden;
             padding: 10px;
             border: 1px solid var(--border);
-            border-radius: 14px;
+            border-radius: 16px;
             background: var(--panel);
-            scroll-snap-type: x mandatory;
         }
 
-        #gallery::-webkit-scrollbar {
+        .gallery::-webkit-scrollbar {
             height: 10px;
         }
 
-        #gallery::-webkit-scrollbar-thumb {
-            background: #24314f;
+        .gallery::-webkit-scrollbar-thumb {
+            background: #223055;
             border-radius: 999px;
         }
 
         .thumb {
             flex: 0 0 auto;
-            width: 160px;
-            scroll-snap-align: center;
+            width: var(--frame-w);
+            height: var(--frame-h);
             border: 1px solid var(--border);
-            border-radius: 12px;
-            background: #0c1427;
+            border-radius: 14px;
             overflow: hidden;
+            background: #0b1220;
+            scroll-snap-align: center;
+            box-shadow: 0 8px 18px rgba(0, 0, 0, .28);
         }
 
         .thumb img {
             width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
             display: block;
         }
 
         .thumb a {
-            display: block;
-            text-align: center;
-            padding: 8px;
-            text-decoration: none;
-            color: var(--fg);
-            border-top: 1px solid var(--border);
-            font-size: .9rem;
+            position: absolute;
+            inset: auto 10px 10px auto;
+            /* si luego quieres overlay, deja esto */
+            display: none;
         }
 
-        .hint {
-            font-size: .9rem;
-            opacity: .8;
+        /* Responsive: que el contenedor principal nunca desborde en pantallas chicas */
+        .stack {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .frame,
+        .thumb {
+            max-width: calc(100vw - 48px);
         }
     </style>
 </head>
 
 <body>
     <header>
-        <div>
+        <div class="container">
             <h1>📷 PWA de Cámara</h1>
-            <p class="hint">Abre la cámara, captura, y tus fotos aparecerán en la galería (scroll
-                <strong>horizontal</strong>). Usa “Limpiar” para borrar temporales.</p>
+            <p class="hint">Las capturas de la galería se muestran exactamente del <strong>mismo tamaño</strong> que la
+                vista de la cámara.</p>
         </div>
     </header>
 
-    <div class="row">
-        <button id="openCamera" class="primary">Abrir cámara</button>
-        <button id="takePhoto">Tomar foto</button>
-        <button id="switchCamera">Cambiar a frontal</button>
-        <button id="clearGallery">Limpiar</button>
-    </div>
-
-    <section id="cameraContainer">
-        <div class="video-wrap">
-            <video id="video" autoplay playsinline></video>
+    <main class="container">
+        <div class="toolbar">
+            <button id="openCamera" class="primary">Abrir cámara</button>
+            <button id="takePhoto">Tomar foto</button>
+            <button id="switchCamera">Cambiar a frontal</button>
+            <button id="clearGallery" class="danger">Limpiar</button>
         </div>
-    </section>
 
-    <!-- Canvas fuera de la vista para generar blobs/urls temporales -->
-    <canvas id="canvas" width="320" height="240" hidden></canvas>
+        <section id="cameraContainer" class="stage">
+            <div class="frame">
+                <video id="video" autoplay playsinline></video>
+            </div>
+        </section>
 
-    <section class="gallery-wrap">
-        <div class="gallery-title">
-            <h2>Galería</h2>
-            <span class="hint">Temporal (URLs Blob). No es carrusel; desplázate lateralmente.</span>
-        </div>
-        <div id="gallery" role="list" aria-label="Galería de capturas (scroll horizontal)"></div>
-    </section>
+        <!-- canvas oculto solo para generar blobs/urls -->
+        <canvas id="canvas" width="320" height="240" hidden></canvas>
+
+        <section class="gallery-wrap">
+            <div class="gallery-head">
+                <h2 style="margin:0;font-size:1.05rem;">Galería</h2>
+                <span class="hint">Scroll horizontal • URLs temporales (blob:)</span>
+            </div>
+            <div id="gallery" class="gallery" role="list" aria-label="Galería de capturas"></div>
+        </section>
+    </main>
 
     <script src="app.js"></script>
     <script>
