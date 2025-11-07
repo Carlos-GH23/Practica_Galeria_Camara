@@ -1,4 +1,4 @@
-// UI refs
+// Refs
 const els = {
     open: document.getElementById('openCamera'),
     snap: document.getElementById('takePhoto'),
@@ -12,16 +12,16 @@ const els = {
 const ctx = els.canvas.getContext('2d');
 
 let stream = null;
-let facing = 'environment';   // 'user' para frontal
-const objectUrls = [];        // URLs temporales de esta sesión
+let facing = 'environment';     // 'user' para frontal
+const objectUrls = [];          // URLs temporales (blob:) de esta sesión
 
-// Ajusta las variables CSS --frame-w / --frame-h a partir del video real
+// Ajusta variables CSS --frame-w / --frame-h a partir de las dimensiones reales del video
 function setFrameVarsFromVideo() {
     const vw = els.video.videoWidth || 320;
     const vh = els.video.videoHeight || 240;
 
-    // Escala para caber en viewport, manteniendo proporción
-    const maxW = Math.min(480, window.innerWidth - 48); // UI limpia sin desbordar
+    // Escala para caber en viewport, manteniendo proporción (misma escala para marco y thumbs)
+    const maxW = Math.min(480, window.innerWidth - 48);
     const scale = Math.min(1, maxW / vw);
     const dispW = Math.round(vw * scale);
     const dispH = Math.round(vh * scale);
@@ -48,7 +48,7 @@ async function startCamera() {
 
     els.video.srcObject = stream;
 
-    // Asegura que el tamaño del frame se actualice cuando el video conozca sus dimensiones reales
+    // Cuando el video tenga sus dimensiones reales, sincronizamos tamaños
     els.video.onloadedmetadata = () => {
         setFrameVarsFromVideo();
         els.stage.classList.add('active');
@@ -59,9 +59,7 @@ async function startCamera() {
 }
 
 function stopCamera() {
-    if (stream) {
-        for (const t of stream.getTracks()) t.stop();
-    }
+    if (stream) for (const t of stream.getTracks()) t.stop();
     stream = null;
     els.video.srcObject = null;
     els.stage.classList.remove('active');
@@ -73,27 +71,27 @@ function updateFlipLabel() {
     els.flip.textContent = (facing === 'environment') ? 'Cambiar a frontal' : 'Cambiar a trasera';
 }
 
-// Captura y agrega a galería con MISMAS dimensiones visuales que el frame
 function takePhoto() {
     if (!stream) {
         alert('Primero abre la cámara');
         return;
     }
+
     const w = els.video.videoWidth || 320;
     const h = els.video.videoHeight || 240;
 
-    // Renderizamos a resolución real del frame
+    // Renderizamos a la resolución real capturada
     els.canvas.width = w;
     els.canvas.height = h;
     ctx.drawImage(els.video, 0, 0, w, h);
 
     els.canvas.toBlob((blob) => {
         if (!blob) return;
-        const url = URL.createObjectURL(blob);
+        const url = URL.createObjectURL(blob); // URL temporal (blob:)
         objectUrls.push(url);
         addThumb(url);
 
-        // auto-scroll a la última
+        // Auto scroll al final (última imagen)
         requestAnimationFrame(() => {
             els.gallery.scrollTo({ left: els.gallery.scrollWidth, behavior: 'smooth' });
         });
@@ -101,6 +99,7 @@ function takePhoto() {
 }
 
 function addThumb(url) {
+    // Cada thumb usa las MISMAS dimensiones visuales que el marco (definidas por --frame-w/h)
     const figure = document.createElement('figure');
     figure.className = 'thumb';
     figure.setAttribute('role', 'listitem');
@@ -110,19 +109,21 @@ function addThumb(url) {
     img.alt = 'Foto capturada';
     img.decoding = 'async';
 
-    // (opcional) descarga rápida
-    // const a = document.createElement('a');
-    // a.href = url;
-    // a.download = 'captura-' + new Date().toISOString().replace(/[:.]/g,'-') + '.png';
-    // a.textContent = 'Descargar';
-    // figure.appendChild(a);
+    // Botón de descarga superpuesto (no altera el alto del thumb)
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'captura-' + new Date().toISOString().replace(/[:.]/g, '-') + '.png';
+    a.textContent = 'Descargar';
+    a.className = 'dl';
+    a.setAttribute('aria-label', 'Descargar foto');
 
     figure.appendChild(img);
+    figure.appendChild(a);
     els.gallery.appendChild(figure);
 }
 
 function clearGallery() {
-    for (const u of objectUrls) URL.revokeObjectURL(u);
+    for (const u of objectUrls) URL.revokeObjectURL(u); // libera memoria de blobs
     objectUrls.length = 0;
     els.gallery.innerHTML = '';
 }
@@ -139,12 +140,12 @@ els.snap.addEventListener('click', takePhoto);
 els.clear.addEventListener('click', clearGallery);
 els.flip.addEventListener('click', flipCamera);
 
-// Recalcula tamaños si cambia el viewport (mantener paridad cámara/galería)
+// Mantener dimensiones sincronizadas si cambia el viewport
 window.addEventListener('resize', () => {
     if (stream && els.video.videoWidth) setFrameVarsFromVideo();
 });
 
-// Buenas prácticas de liberación
+// Buenas prácticas: liberar cámara al salir/ocultar
 window.addEventListener('pagehide', stopCamera);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') stopCamera(); });
 window.addEventListener('beforeunload', stopCamera);

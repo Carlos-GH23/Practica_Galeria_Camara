@@ -1,5 +1,5 @@
-// Service Worker: precache + cache-first con filtro seguro
-const CACHE = 'camara-pwa-v3';
+// Service Worker: precache + cache-first con filtro seguro (evita chrome-extension://)
+const CACHE = 'camara-pwa-v4';
 const ASSETS = [
     './',
     './index.html',

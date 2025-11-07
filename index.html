@@ -12,16 +12,16 @@
 
     <style>
         :root {
+            /* Estas variables se recalculan desde JS con el tamaño real del video */
+            --frame-w: 420px;
+            --frame-h: 315px;
+            /* 4:3 por defecto */
             --bg: #0b1220;
             --panel: #0f182d;
             --border: #1f2a44;
             --muted: #93a4c3;
             --fg: #e6edf3;
             --accent: #0ea5e9;
-            /* dimensiones del frame (se ajustan dinámicamente desde JS en cuanto carga la cámara) */
-            --frame-w: 420px;
-            --frame-h: 315px;
-            /* 4:3 por defecto */
         }
 
         * {
@@ -102,6 +102,7 @@
             border-color: #a43a3e;
         }
 
+        /* Marco de la cámara: estas dimensiones se replican en la galería */
         .frame {
             width: var(--frame-w);
             height: var(--frame-h);
@@ -128,7 +129,7 @@
             object-fit: contain;
         }
 
-        /* Galería horizontal con thumbs del MISMO tamaño que el frame */
+        /* Galería HORIZONTAL (NO carrusel, sin snap: solo scroll libre) */
         .gallery-wrap {
             margin-top: 16px;
         }
@@ -145,6 +146,7 @@
             gap: 12px;
             overflow-x: auto;
             overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
             padding: 10px;
             border: 1px solid var(--border);
             border-radius: 16px;
@@ -160,7 +162,9 @@
             border-radius: 999px;
         }
 
+        /* Cada item de galería con EXACTAMENTE la MISMA dimensión visual que la cámara */
         .thumb {
+            position: relative;
             flex: 0 0 auto;
             width: var(--frame-w);
             height: var(--frame-h);
@@ -168,7 +172,6 @@
             border-radius: 14px;
             overflow: hidden;
             background: #0b1220;
-            scroll-snap-align: center;
             box-shadow: 0 8px 18px rgba(0, 0, 0, .28);
         }
 
@@ -180,21 +183,21 @@
             display: block;
         }
 
-        .thumb a {
+        /* Botón de descargar superpuesto (no altera el alto del thumb) */
+        .thumb a.dl {
             position: absolute;
-            inset: auto 10px 10px auto;
-            /* si luego quieres overlay, deja esto */
-            display: none;
+            right: 10px;
+            bottom: 10px;
+            padding: 6px 10px;
+            font-weight: 600;
+            text-decoration: none;
+            color: var(--fg);
+            background: #111a33;
+            border: 1px solid var(--border);
+            border-radius: 10px;
         }
 
-        /* Responsive: que el contenedor principal nunca desborde en pantallas chicas */
-        .stack {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 12px;
-        }
-
+        /* Responsive: que no desborde en pantallas chicas */
         .frame,
         .thumb {
             max-width: calc(100vw - 48px);
@@ -206,8 +209,8 @@
     <header>
         <div class="container">
             <h1>📷 PWA de Cámara</h1>
-            <p class="hint">Las capturas de la galería se muestran exactamente del <strong>mismo tamaño</strong> que la
-                vista de la cámara.</p>
+            <p class="hint">Galería con el <strong>mismo tamaño</strong> que la vista de la cámara. Scroll horizontal
+                libre (NO carrusel).</p>
         </div>
     </header>
 
@@ -225,7 +228,7 @@
             </div>
         </section>
 
-        <!-- canvas oculto solo para generar blobs/urls -->
+        <!-- Canvas oculto solo para generar blobs/urls -->
         <canvas id="canvas" width="320" height="240" hidden></canvas>
 
         <section class="gallery-wrap">
